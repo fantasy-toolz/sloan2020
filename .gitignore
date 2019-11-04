@@ -1,0 +1,4 @@
+.ipynb*
+*.DS_*tore*
+notebooks/__pycache__
+notebooks/__pycache__/*
