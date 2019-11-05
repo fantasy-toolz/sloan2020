@@ -6,8 +6,9 @@
 The repository for public tools to generate MLB predictions using the k-means clustering technique presented by Petersen & Rentz 2020.
 
 ### TODO
--Add Windows compability
--Change scraper to MLB.com scraper for using pure public data
--Break .py files into a package which installs (i.e. add a __init__.py and installer)
--Update definition structure into classes
--???
+1. Add Windows compability
+2. Change scraper to MLB.com scraper for using pure public data
+3. Break .py files into a package which installs (i.e. add a __init__.py and installer)
+4. Update definition structure into classes
+5. Homogenise pitching and hitting to be same definitions
+6. VERIFICATION
