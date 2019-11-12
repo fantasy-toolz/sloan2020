@@ -97,10 +97,11 @@ def compute_cluster(df,years,nclusters,min_pas=150,verbose=0):
     
     returns
     -----------
-    year_df       :
-    df            :
-    stereotype_df :
+    year_df                    :
+    df                         :
+    stereotype_df              :
     hitter_cluster_centroid_df :
+    transform                  :
     
     
     todo
@@ -120,13 +121,7 @@ def compute_cluster(df,years,nclusters,min_pas=150,verbose=0):
                 df[column] = df[column].str[:-1]
                 df[column] = df[column].astype(float)
 
-    # if selecting for starters
-    #df = df.loc[(df['TBF']> 150) & (df['GS'] > 10) ]
-
-    # if selecting for relievers
-    #df = df.loc[(df['TBF']> 100) & (df['GS'] < 10) ]
-    
-    # if selecting for starters
+    # put in a limit for minimum plate appearances
     df = df.loc[(df['PA']> min_pas)]
 
     # select the categories to include
@@ -157,6 +152,7 @@ def compute_cluster(df,years,nclusters,min_pas=150,verbose=0):
     
     kmeans.fit(Y)
     predict = kmeans.predict(Y)
+    transform = kmeans.transform(Y)
     centroids = kmeans.cluster_centers_
     labels = kmeans.labels_
     #print(centroids)
@@ -240,7 +236,7 @@ def compute_cluster(df,years,nclusters,min_pas=150,verbose=0):
     df.to_csv('../tables/2019All_Player_Data_starters{}.csv'.format(nclusters), index = False)
     stereotype_df.to_csv('../tables/2019Stereotype_Players_starters{}.csv'.format(nclusters), index = False)
 
-    return year_df,df,stereotype_df,hitter_cluster_centroid_df
+    return year_df,df,stereotype_df,hitter_cluster_centroid_df,transform
 
 
 
