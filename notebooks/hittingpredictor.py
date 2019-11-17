@@ -107,6 +107,7 @@ def compute_cluster(df,years,nclusters,min_pas=150,verbose=0):
     todo
     -----------
     -change internal naming conventions to make sense
+    -needs a silent version
     
     '''
 

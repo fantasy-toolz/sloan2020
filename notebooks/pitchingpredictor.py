@@ -158,6 +158,7 @@ def compute_cluster_pitching(df,years,nclusters,min_ip=10,verbose=0):
     
     kmeans.fit(Y)
     predict = kmeans.predict(Y)
+    transform = kmeans.transform(Y)
     centroids = kmeans.cluster_centers_
     labels = kmeans.labels_
     
@@ -243,7 +244,7 @@ def compute_cluster_pitching(df,years,nclusters,min_ip=10,verbose=0):
     stereotype_df.to_csv('../tables/Stereotype_Players_starters{}.csv'.format(nclusters), index = False)
 
 
-    return year_df,df,stereotype_df,cluster_centroid_df
+    return year_df,df,stereotype_df,cluster_centroid_df,transform
 
 
 
