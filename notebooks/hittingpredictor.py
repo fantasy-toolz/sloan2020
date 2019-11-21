@@ -247,7 +247,7 @@ def generate_player_prediction(pl,df,hitter_cluster_centroid_df,\
                                year_weights=[1.,1.,1.,1.],\
                                year_weights_penalty=[0.,0.,0.,0.],\
                                regression_factor=1.,err_regression_factor=1.,\
-                               AgeDict={},verbose=0):
+                               AgeDict={},verbose=0,return_stats=False):
     '''
     generate predictions for an individual player
     
@@ -351,9 +351,15 @@ def generate_player_prediction(pl,df,hitter_cluster_centroid_df,\
     if nyrs < 0.5: nyrs=1000.
 
     # concatenate the data for printing
+    Stats = {}
+    Stats['PA'] = estimated_pas
     if estimated_pas > 200:
         print(pl,end=', ')
         for indx,p in enumerate(pstats):
+            Stats[fantasy_stats[indx]] = np.round(estimated_pas*p/100.,2)
+            Stats['e'+fantasy_stats[indx]] = np.round(estimated_pas*perr[indx]/100.,2)
+
+            
             print(np.round(estimated_pas*p/100.,2),end=', ')
             print(np.round(estimated_pas*perr[indx]/100.,2),end=', ')
 
@@ -364,5 +370,8 @@ def generate_player_prediction(pl,df,hitter_cluster_centroid_df,\
         print('')
 
 
+    if return_stats:
+        return Stats
 
 
+    
