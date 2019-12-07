@@ -114,6 +114,8 @@ def compute_cluster(df,years,nclusters,min_pas=150,verbose=0):
 
     df = df.loc[df['Name']==df['Name'] ]#) & (hitter_eoy_df['wRC+'] != '&nbsp;')]
 
+    df = df.loc[df['Year'].isin(years)]
+    
     for column in df.columns[3:]:
         if column != 'wRC+':
             try:
@@ -165,11 +167,12 @@ def compute_cluster(df,years,nclusters,min_pas=150,verbose=0):
     for column in hitter_cluster_centroid_df.columns[:-1]:
         stat = column.split(".")[0]
         # this formula scales relative to overall value
-        meanval = np.nanmedian(df['{0}.Normalize'.format(stat)])
+        meanval = np.nanmean(df['{0}.Normalize'.format(stat)])
         stdval = np.nanstd(df['{0}.Normalize'.format(stat)])
 
-        hitter_cluster_centroid_df['{0}.Rank'.format(stat)]  = (hitter_cluster_centroid_df['{0}.Centroid'.format(stat)] - meanval)/stdval
-        hitter_cluster_centroid_df['Tot.Rank'] = hitter_cluster_centroid_df['Tot.Rank'] +hitter_cluster_centroid_df['{0}.Rank'.format(stat)]
+        if stat != 'AB':
+            hitter_cluster_centroid_df['{0}.Rank'.format(stat)]  = (hitter_cluster_centroid_df['{0}.Centroid'.format(stat)] - meanval)/stdval
+            hitter_cluster_centroid_df['Tot.Rank'] = hitter_cluster_centroid_df['Tot.Rank'] +hitter_cluster_centroid_df['{0}.Rank'.format(stat)]
 
 
     # predict the clusters
@@ -236,6 +239,8 @@ def compute_cluster(df,years,nclusters,min_pas=150,verbose=0):
     year_df.to_csv('../tables/2019Clusters_By_Year_starters{}.csv'.format(nclusters), index = False)
     df.to_csv('../tables/2019All_Player_Data_starters{}.csv'.format(nclusters), index = False)
     stereotype_df.to_csv('../tables/2019Stereotype_Players_starters{}.csv'.format(nclusters), index = False)
+    
+    hitter_cluster_centroid_df = hitter_cluster_centroid_df.sort_values(['Value Cluster'], ascending = False)
 
     return year_df,df,stereotype_df,hitter_cluster_centroid_df,transform
 
@@ -354,20 +359,21 @@ def generate_player_prediction(pl,df,hitter_cluster_centroid_df,\
     Stats = {}
     Stats['PA'] = estimated_pas
     if estimated_pas > 200:
-        print(pl,end=', ')
+        if verbose: print(pl,end=', ')
         for indx,p in enumerate(pstats):
             Stats[fantasy_stats[indx]] = np.round(estimated_pas*p/100.,2)
             Stats['e'+fantasy_stats[indx]] = np.round(estimated_pas*perr[indx]/100.,2)
 
-            
-            print(np.round(estimated_pas*p/100.,2),end=', ')
-            print(np.round(estimated_pas*perr[indx]/100.,2),end=', ')
+            if verbose:
+                print(np.round(estimated_pas*p/100.,2),end=', ')
+                print(np.round(estimated_pas*perr[indx]/100.,2),end=', ')
 
         # for computing adjustment factors later...
-        print(int(estimated_pas),end=', ')
-        print(np.round(yrsum/yrsum_denom,2),end=', ')
+        if verbose:
+            print(int(estimated_pas),end=', ')
+            print(np.round(yrsum/yrsum_denom,2),end=', ')
 
-        print('')
+            print('')
 
 
     if return_stats:
