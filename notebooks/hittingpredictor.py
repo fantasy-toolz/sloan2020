@@ -114,6 +114,7 @@ def compute_cluster(df,years,nclusters,min_pas=150,verbose=0):
 
     df = df.loc[df['Name']==df['Name'] ]#) & (hitter_eoy_df['wRC+'] != '&nbsp;')]
 
+    # verify that we are selecting the appropriate years
     df = df.loc[df['Year'].isin(years)]
     
     for column in df.columns[3:]:
@@ -331,7 +332,17 @@ def generate_player_prediction(pl,df,hitter_cluster_centroid_df,\
                 pstats[indx] += year_weights[year] * ( regression_factor*(statnorm-statcen) + statcen)
                 
                 # these could be added in quadrature for more accuracy, just have to watch the weights
-                perr[indx] += year_weights[year] * ( err_regression_factor*np.abs(statnorm-statcen))
+                
+                #print(df[stat])
+                # add in the Possion error as a minimum uncertainty
+                statnormraw = list(df['{0}'.format(stat)][(df['Name']==pl) & (df['Year']==year) ])[0]
+                normraw = list(df['PA'][(df['Name']==pl) & (df['Year']==year) ])[0]
+                # alternate, or additional, would be to have the mean distance between clusters (e.g. what would happen if you were assigned to the incorrect cluster).
+    
+                statsdiff = np.nanmin([err_regression_factor*np.abs(statnorm-statcen),\
+                                      100.*np.sqrt(statnormraw)/normraw])
+                
+                perr[indx] += year_weights[year] * ( statsdiff )
             
             # keep track of the denominators
             yrsum += year_weights[year]
@@ -380,4 +391,91 @@ def generate_player_prediction(pl,df,hitter_cluster_centroid_df,\
         return Stats
 
 
+
+
+
+def make_manual_predictions_batting(lght_df,hitter_cluster_centroid_df,chkstat,\
+                                    year_weights=[0.05,0.05,0.3,0.6],\
+                                    prefac=0.5,prefac_err=1.,nclusters=12,verbose=0):
+    """
+    make a prediction through the years for a single player
     
+    inputs
+    -------------------
+    lght_df
+    df
+    hitter_cluster_centroid_df
+    chkstat
+    year_weights=[0.05,0.05,0.3,0.6]
+    prefac=0.5
+    prefac_err=1.
+    nclusters=12.
+    
+    
+    
+    """
+    
+    # how many years of data do we have?
+    uni_years = np.unique(lght_df['Year'])
+    clustervals = np.zeros([uni_years.size,nclusters])
+
+
+    
+    indi_values = np.zeros(uni_years.size)
+    unc_values = np.zeros(uni_years.size)
+
+    # assign each year to a cluster
+    for iyear,year in enumerate(uni_years):
+        for val in lght_df.loc[lght_df['Year']==year][chkstat+'.Normalize']:
+            clustervals[iyear] += (np.abs(val-hitter_cluster_centroid_df[chkstat+'.Centroid']))
+    
+
+    # cycle through the years for the predictions
+    for iyear,year in enumerate(uni_years):
+        bestcluster = np.argmin(clustervals[iyear])
+
+        bestclusterval = np.array(hitter_cluster_centroid_df['Value Cluster'])[bestcluster]
+
+        
+        lght_df_year = lght_df.loc[lght_df['Year']==year]
+        statval = np.array(lght_df_year[chkstat+'.Normalize'])[0]
+
+        cent_df = hitter_cluster_centroid_df.loc[hitter_cluster_centroid_df['Value Cluster']==bestclusterval]
+        statval_predict = np.array(cent_df[chkstat+'.Centroid'])[0]
+
+        
+        # make the prediction from the year
+        indi_values[iyear] = statval_predict+prefac*(statval-statval_predict)
+
+        # make the error prediction from the year
+        unc_values[iyear] = prefac_err*(statval-statval_predict)
+
+        # compute the Poissonian rate for the minimum uncertainty
+        poiss_rate = 100.*np.array(np.sqrt(lght_df_year[chkstat])/lght_df_year['PA'])[0]
+
+        unc_values[iyear] = np.nanmax([prefac_err*(statval-statval_predict),poiss_rate])
+
+
+    pred_vals = np.zeros(uni_years.size)
+    pred_errs = np.zeros(uni_years.size)
+    pred_sum = np.zeros(uni_years.size)
+
+
+    # weight the years appropriately to come up with the total predictions
+    for iweight,weight in enumerate(year_weights[::-1]):
+        for indx in range(0,uni_years.size):
+            if indx-iweight >= 0:
+                pred_vals[indx] += weight*indi_values[indx-iweight]
+                pred_errs[indx] += weight*unc_values[indx-iweight]
+                pred_sum[indx] += weight
+
+    # normalize the prediction years
+    pred_vals /= pred_sum
+
+    if verbose:
+        print('Predicted values:',pred_vals)
+        print('Predicted errors:',pred_errs)
+
+    return uni_years,indi_values,unc_values,pred_vals,pred_errs
+
+

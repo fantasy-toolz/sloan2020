@@ -113,6 +113,9 @@ def compute_cluster_pitching(df,years,nclusters,min_ip=10,verbose=0):
 
     df = df.loc[df['Name']==df['Name'] ]
 
+    # verify that the years are actually the years we want
+    df = df.loc[df['Year'].isin(years)]
+    
     for column in df.columns[3:]:
         if column != 'wRC+':
             try:
@@ -239,6 +242,8 @@ def compute_cluster_pitching(df,years,nclusters,min_ip=10,verbose=0):
         year_df[column] = year_df[column].fillna(0)
     
     
+    cluster_centroid_df = cluster_centroid_df.sort_values(['Value Cluster'], ascending = True)
+    
     year_df.to_csv('../tables/Clusters_By_Year_starters{}.csv'.format(nclusters), index = False)
     df.to_csv('../tables/All_Player_Data_starters{}.csv'.format(nclusters), index = False)
     stereotype_df.to_csv('../tables/Stereotype_Players_starters{}.csv'.format(nclusters), index = False)
@@ -256,7 +261,7 @@ def generate_player_prediction(pl,df,cluster_centroid_df,\
                                year_weights=[1.,1.,1.,1.],\
                                year_weights_penalty=[0.,0.,0.,0.],\
                                regression_factor=1.,err_regression_factor=1.,\
-                               AgeDict={},verbose=0):
+                               AgeDict={},verbose=0,return_stats=True):
     '''
     generate predictions for an individual player
     
@@ -285,8 +290,8 @@ def generate_player_prediction(pl,df,cluster_centroid_df,\
     
     '''
     # initialize the blank arrays
-    pstats = np.zeros(6)
-    perr = np.zeros(6)
+    pstats = np.zeros(5)
+    perr = np.zeros(5)
     
     # initialize counters
     yrsum = 0.
@@ -360,7 +365,7 @@ def generate_player_prediction(pl,df,cluster_centroid_df,\
     if nyrs < 0.5: nyrs=1000.
 
     # concatenate the data for printing
-    if estimated_ips > 10:
+    if (estimated_ips > 10) & (verbose):
         print(pl,end=', ')
         for indx,p in enumerate(pstats):
             print(np.abs(np.round(estimated_ips*p/100.,2)),end=', ')
@@ -371,6 +376,104 @@ def generate_player_prediction(pl,df,cluster_centroid_df,\
         print(np.round(yrsum/yrsum_denom,2),end=', ')
 
         print('')
+        
+    if return_stats:
+        Stats = {}
+        for indx,p in enumerate(pstats):
+            #print(fantasy_stats[indx])
+            Stats[fantasy_stats[indx]] = np.abs(np.round(estimated_ips*p/100.,2))
+            Stats['e'+fantasy_stats[indx]] = np.round(estimated_ips*perr[indx]/100.,2)
+        return Stats
+
+        
+
+
+
+
+
+def make_manual_predictions_pitching(lght_df,hitter_cluster_centroid_df,chkstat,\
+                                    year_weights=[0.05,0.05,0.3,0.6],\
+                                    prefac=0.5,prefac_err=1.,nclusters=12,verbose=0):
+    """
+    make a prediction through the years for a single player
+    
+    inputs
+    -------------------
+    lght_df
+    df
+    hitter_cluster_centroid_df
+    chkstat
+    year_weights=[0.05,0.05,0.3,0.6]
+    prefac=0.5
+    prefac_err=1.
+    nclusters=12.
+    
+    
+    
+    """
+    
+    # how many years of data do we have?
+    uni_years = np.unique(lght_df['Year'])
+    clustervals = np.zeros([uni_years.size,nclusters])
+
+
+    
+    indi_values = np.zeros(uni_years.size)
+    unc_values = np.zeros(uni_years.size)
+
+    # assign each year to a cluster
+    for iyear,year in enumerate(uni_years):
+        for val in lght_df.loc[lght_df['Year']==year][chkstat+'.Normalize']:
+            clustervals[iyear] += (np.abs(val-hitter_cluster_centroid_df[chkstat+'.Centroid']))
+    
+
+    # cycle through the years for the predictions
+    for iyear,year in enumerate(uni_years):
+        bestcluster = np.argmin(clustervals[iyear])
+
+        bestclusterval = np.array(hitter_cluster_centroid_df['Value Cluster'])[bestcluster]
+
+        
+        lght_df_year = lght_df.loc[lght_df['Year']==year]
+        statval = np.array(lght_df_year[chkstat+'.Normalize'])[0]
+
+        cent_df = hitter_cluster_centroid_df.loc[hitter_cluster_centroid_df['Value Cluster']==bestclusterval]
+        statval_predict = np.array(cent_df[chkstat+'.Centroid'])[0]
+
+        
+        # make the prediction from the year
+        indi_values[iyear] = statval_predict+prefac*(statval-statval_predict)
+
+        # make the error prediction from the year
+        unc_values[iyear] = prefac_err*(statval-statval_predict)
+
+        # compute the Poissonian rate for the minimum uncertainty
+        poiss_rate = 100.*np.array(np.sqrt(lght_df_year[chkstat])/lght_df_year['IP'])[0]
+
+        unc_values[iyear] = np.nanmax([prefac_err*(statval-statval_predict),poiss_rate])
+
+
+    pred_vals = np.zeros(uni_years.size)
+    pred_errs = np.zeros(uni_years.size)
+    pred_sum = np.zeros(uni_years.size)
+
+
+    # weight the years appropriately to come up with the total predictions
+    for iweight,weight in enumerate(year_weights[::-1]):
+        for indx in range(0,uni_years.size):
+            if indx-iweight >= 0:
+                pred_vals[indx] += weight*indi_values[indx-iweight]
+                pred_errs[indx] += weight*unc_values[indx-iweight]
+                pred_sum[indx] += weight
+
+    # normalize the prediction years
+    pred_vals /= pred_sum
+
+    if verbose:
+        print('Predicted values:',pred_vals)
+        print('Predicted errors:',pred_errs)
+
+    return uni_years,np.abs(indi_values),np.abs(unc_values),np.abs(pred_vals),np.abs(pred_errs)
 
 
 
